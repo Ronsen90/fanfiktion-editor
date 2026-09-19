@@ -1,0 +1,1447 @@
+﻿<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FF Editor – FanFiktion.de Converter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;0,7..72,700;1,7..72,400;1,7..72,600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+:root {
+  --ink: #1a2420;
+  --ink-soft: #3d4a44;
+  --muted: #6b7872;
+  --paper: #f3efe6;
+  --paper-2: #e8e2d4;
+  --surface: #faf7f0;
+  --accent: #0f6b5c;
+  --accent-hover: #0a5246;
+  --accent-soft: rgba(15, 107, 92, 0.12);
+  --line: rgba(26, 36, 32, 0.12);
+  --danger: #8b3a2f;
+  --shadow: 0 12px 40px rgba(26, 36, 32, 0.08);
+  --radius: 14px;
+  --font-ui: "Outfit", system-ui, sans-serif;
+  --font-text: "Literata", Georgia, serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--font-ui);
+  color: var(--ink);
+  background:
+    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(15, 107, 92, 0.14), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 90% 0%, rgba(139, 58, 47, 0.08), transparent 50%),
+    linear-gradient(165deg, #ebe4d4 0%, var(--paper) 40%, #e4ddd0 100%);
+  line-height: 1.5;
+}
+
+.page {
+  width: min(1120px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 2rem 0 3rem;
+}
+
+.header {
+  margin-bottom: 1.75rem;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #f7f3ea;
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+  box-shadow: 0 8px 24px rgba(15, 107, 92, 0.28);
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: clamp(1.6rem, 3vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.tagline {
+  margin: 0.15rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.15rem 1.15rem 1.25rem;
+  min-height: 0;
+}
+
+.panel-head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.panel-head p {
+  margin: 0.25rem 0 0.9rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem;
+  margin-bottom: 0.75rem;
+  background: var(--paper-2);
+  border-radius: 10px;
+  border: 1px solid var(--line);
+}
+
+.toolbar-group {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 1.5rem;
+  background: var(--line);
+  margin: 0 0.2rem;
+}
+
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.15rem;
+  height: 2.15rem;
+  padding: 0 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.tool-btn:hover,
+.tool-btn:focus-visible {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--ink);
+  outline: none;
+}
+
+.tool-btn.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: rgba(15, 107, 92, 0.25);
+}
+
+.tool-btn .u {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.tool-btn .s {
+  text-decoration: line-through;
+}
+
+.tool-btn-ghost {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.editor {
+  min-height: 340px;
+  max-height: 55vh;
+  overflow: auto;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fffefb;
+  font-family: var(--font-text);
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: var(--ink);
+  outline: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.editor:focus {
+  border-color: rgba(15, 107, 92, 0.45);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.editor:empty::before {
+  content: attr(data-placeholder);
+  color: #9aa39e;
+  pointer-events: none;
+}
+
+.editor p {
+  margin: 0;
+}
+
+.editor p + p {
+  margin-top: 0;
+}
+
+.editor p:last-child {
+  margin-bottom: 0;
+}
+
+.editor a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-bottom: 0.75rem;
+}
+
+.btn {
+  appearance: none;
+  border: none;
+  border-radius: 10px;
+  padding: 0.7rem 1rem;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease, opacity 0.15s ease;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #f7f3ea;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn-secondary {
+  background: var(--paper-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #ddd6c6;
+}
+
+.output {
+  width: 100%;
+  min-height: 340px;
+  max-height: 55vh;
+  resize: vertical;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #1a2420;
+  color: #d8e8e2;
+  font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  outline: none;
+}
+
+.output:focus {
+  border-color: rgba(15, 107, 92, 0.45);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.output::placeholder {
+  color: #7a8a84;
+}
+
+.status {
+  min-height: 1.25rem;
+  margin: 0.65rem 0 0;
+  font-size: 0.85rem;
+  color: var(--accent);
+}
+
+.status.is-error {
+  color: var(--danger);
+}
+
+.footer {
+  margin-top: 1.5rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.footer p {
+  margin: 0;
+}
+
+.footer code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.78rem;
+  background: rgba(26, 36, 32, 0.06);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+.footer a {
+  color: var(--accent);
+}
+
+.link-btn {
+  margin-top: 0.4rem;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  color: var(--accent-hover);
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.modal[hidden] {
+  display: none !important;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(26, 36, 32, 0.45);
+}
+
+.modal-card {
+  position: relative;
+  width: min(420px, 100%);
+  padding: 1.25rem 1.25rem 1.1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.modal-card h3 {
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.85rem;
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+}
+
+.field input {
+  appearance: none;
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefb;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.95rem;
+}
+
+.field input:focus {
+  outline: none;
+  border-color: rgba(15, 107, 92, 0.45);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.modal-error {
+  margin: -0.2rem 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--danger);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  margin-top: 0.25rem;
+}
+
+@media (max-width: 860px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .editor,
+  .output {
+    min-height: 260px;
+    max-height: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .page {
+    width: min(100% - 1.25rem, 1120px);
+    padding-top: 1.25rem;
+  }
+
+  .brand-mark {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+}
+
+</style>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">FF</span>
+        <div>
+          <h1>FF Editor</h1>
+          <p class="tagline">Text schreiben → FanFiktion.de-Formatierung kopieren</p>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel write-panel" aria-labelledby="write-heading">
+        <div class="panel-head">
+          <h2 id="write-heading">Schreiben</h2>
+          <p>Formatiere den Text wie gewohnt. Fertig? Dann exportieren.</p>
+        </div>
+
+        <div class="toolbar" role="toolbar" aria-label="Textformatierung">
+          <div class="toolbar-group">
+            <button type="button" class="tool-btn" data-cmd="bold" title="Fett (Strg+B)" aria-label="Fett">
+              <strong>B</strong>
+            </button>
+            <button type="button" class="tool-btn" data-cmd="italic" title="Kursiv (Strg+I)" aria-label="Kursiv">
+              <em>I</em>
+            </button>
+            <button type="button" class="tool-btn" data-cmd="underline" title="Unterstrichen (Strg+U)" aria-label="Unterstrichen">
+              <span class="u">U</span>
+            </button>
+            <button type="button" class="tool-btn" data-cmd="strikeThrough" title="Durchgestrichen" aria-label="Durchgestrichen">
+              <span class="s">S</span>
+            </button>
+          </div>
+          <div class="toolbar-divider" aria-hidden="true"></div>
+          <div class="toolbar-group">
+            <button type="button" class="tool-btn" data-cmd="justifyLeft" title="Linksbündig" aria-label="Linksbündig">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M3 5h18v2H3V5zm0 4h12v2H3V9zm0 4h18v2H3v-2zm0 4h12v2H3v-2z"/></svg>
+            </button>
+            <button type="button" class="tool-btn" data-cmd="justifyCenter" title="Zentriert" aria-label="Zentriert">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M3 5h18v2H3V5zm3 4h12v2H6V9zm-3 4h18v2H3v-2zm3 4h12v2H6v-2z"/></svg>
+            </button>
+            <button type="button" class="tool-btn" data-cmd="justifyRight" title="Rechtsbündig" aria-label="Rechtsbündig">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M3 5h18v2H3V5zm6 4h12v2H9V9zm-6 4h18v2H3v-2zm6 4h12v2H9v-2z"/></svg>
+            </button>
+          </div>
+          <div class="toolbar-divider" aria-hidden="true"></div>
+          <div class="toolbar-group">
+            <button type="button" class="tool-btn" id="btn-link" title="Link einfügen" aria-label="Link einfügen">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M3.9 12a5 5 0 0 1 5-5h4v2h-4a3 3 0 0 0 0 6h4v2h-4a5 5 0 0 1-5-5zm7-1h2v2h-2v-2zm4-4h4a5 5 0 0 1 0 10h-4v-2h4a3 3 0 0 0 0-6h-4V7z"/></svg>
+            </button>
+          </div>
+          <div class="toolbar-divider" aria-hidden="true"></div>
+          <div class="toolbar-group">
+            <button type="button" class="tool-btn tool-btn-ghost" id="btn-clear" title="Editor leeren" aria-label="Editor leeren">Leeren</button>
+          </div>
+        </div>
+
+        <div
+          id="editor"
+          class="editor"
+          contenteditable="true"
+          role="textbox"
+          aria-multiline="true"
+          aria-label="Texteditor"
+          data-placeholder="Schreibe oder füge hier deinen Text ein…"
+        ></div>
+      </section>
+
+      <section class="panel export-panel" aria-labelledby="export-heading">
+        <div class="panel-head">
+          <h2 id="export-heading">FanFiktion.de-Export</h2>
+          <p>Tags bereit zum Einfügen in den Kapitel-Editor.</p>
+        </div>
+
+        <div class="export-actions">
+          <button type="button" class="btn btn-primary" id="btn-export">Für FanFiktion.de exportieren</button>
+          <button type="button" class="btn btn-secondary" id="btn-copy" disabled>In Zwischenablage kopieren</button>
+        </div>
+
+        <textarea
+          id="output"
+          class="output"
+          readonly
+          placeholder="Hier erscheint der exportierte Text mit [style]- und [align]-Tags…"
+          aria-label="Exportierter FanFiktion.de-Text"
+        ></textarea>
+
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>
+        Erzeugt Tags wie
+        <code>[style type="bold"]</code>,
+        <code>[style type="italic"]</code>,
+        <code>[align type="center"]</code>,
+        <code>[link href="…"]</code>
+        laut
+        <a href="https://www.fanfiktion.de/p/hilfe_tags/0" target="_blank" rel="noopener noreferrer">FanFiktion.de-Hilfe</a>.
+      </p>
+      <p>
+        <button type="button" class="link-btn" id="btn-debug">
+          Diagnose: zeigen, was beim letzten Einfügen ankam
+        </button>
+      </p>
+    </footer>
+  </div>
+
+  <div class="modal" id="link-modal" hidden>
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="link-modal-title">
+      <h3 id="link-modal-title">Link einfügen</h3>
+      <label class="field">
+        <span>Anzeigetext</span>
+        <input type="text" id="link-text" placeholder="Anzeigetext" autocomplete="off" />
+      </label>
+      <label class="field">
+        <span>URL</span>
+        <input type="url" id="link-url" placeholder="https://…" autocomplete="off" />
+      </label>
+      <p class="modal-error" id="link-error" hidden></p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" data-close-modal>Abbrechen</button>
+        <button type="button" class="btn btn-primary" id="link-insert">Einfügen</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+(function () {
+  "use strict";
+
+  const editor = document.getElementById("editor");
+  const output = document.getElementById("output");
+  const statusEl = document.getElementById("status");
+  const btnExport = document.getElementById("btn-export");
+  const btnCopy = document.getElementById("btn-copy");
+  const btnClear = document.getElementById("btn-clear");
+  const btnDebug = document.getElementById("btn-debug");
+  const btnLink = document.getElementById("btn-link");
+  const linkModal = document.getElementById("link-modal");
+  const linkTextInput = document.getElementById("link-text");
+  const linkUrlInput = document.getElementById("link-url");
+  const linkError = document.getElementById("link-error");
+  const linkInsertBtn = document.getElementById("link-insert");
+
+  let lastPaste = null;
+  let savedSelection = null;
+
+  const STYLE_MAP = {
+    bold: "bold",
+    italic: "italic",
+    underline: "underlined",
+    strike: "linethrough",
+  };
+
+  const ALIGN_MAP = {
+    left: "left",
+    center: "center",
+    right: "right",
+    start: "left",
+    end: "right",
+  };
+
+  function setStatus(message, isError) {
+    statusEl.textContent = message || "";
+    statusEl.classList.toggle("is-error", Boolean(isError));
+  }
+
+  function focusEditor() {
+    editor.focus();
+  }
+
+  const ALIGN_COMMANDS = {
+    justifyLeft: "left",
+    justifyCenter: "center",
+    justifyRight: "right",
+  };
+
+  function runCommand(command) {
+    focusEditor();
+    if (ALIGN_COMMANDS[command]) {
+      applyAlignment(ALIGN_COMMANDS[command]);
+    } else {
+      document.execCommand(command, false, null);
+    }
+    updateToolbarState();
+  }
+
+  function rangeIntersectsNode(range, node) {
+    const nodeRange = document.createRange();
+    try {
+      nodeRange.selectNodeContents(node);
+    } catch (_) {
+      return false;
+    }
+    return (
+      range.compareBoundaryPoints(Range.END_TO_START, nodeRange) < 0 &&
+      range.compareBoundaryPoints(Range.START_TO_END, nodeRange) > 0
+    );
+  }
+
+  function getTopLevelBlock(node) {
+    let el = node && node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    let top = null;
+    while (el && el !== editor) {
+      if (isBlockElement(el)) top = el;
+      el = el.parentElement;
+    }
+    return top;
+  }
+
+  function getSelectedTopBlocks() {
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return [];
+    const range = sel.getRangeAt(0);
+    if (!editor.contains(range.commonAncestorContainer) && range.commonAncestorContainer !== editor) {
+      return [];
+    }
+
+    const blocks = Array.from(editor.children).filter(
+      (child) => isBlockElement(child) && rangeIntersectsNode(range, child)
+    );
+
+    if (blocks.length) return blocks;
+
+    const top = getTopLevelBlock(range.startContainer);
+    return top ? [top] : [];
+  }
+
+  function clearDescendantAlign(root) {
+    root.querySelectorAll("div, p, li, h1, h2, h3, h4, h5, h6, blockquote").forEach((el) => {
+      if (el === root) return;
+      if (el.style.textAlign) el.style.textAlign = "";
+      if (el.hasAttribute("align")) el.removeAttribute("align");
+    });
+  }
+
+  function unwrapRedundantAlignDivs(root) {
+    let changed = true;
+    while (changed) {
+      changed = false;
+      Array.from(root.querySelectorAll("div")).forEach((div) => {
+        if (!root.contains(div) || div === root) return;
+        const style = div.getAttribute("style") || "";
+        const onlyAlign =
+          !style.trim() ||
+          /^text-align\s*:\s*(left|center|right|start|end)\s*;?\s*$/i.test(style.trim());
+        if (!onlyAlign) return;
+        if (div.attributes.length > 1) return; // keep if other attrs
+        if (div.attributes.length === 1 && !div.hasAttribute("style") && !div.hasAttribute("align")) {
+          return;
+        }
+        // Unwrap: move children before div, then remove div
+        const parent = div.parentNode;
+        if (!parent) return;
+        while (div.firstChild) parent.insertBefore(div.firstChild, div);
+        parent.removeChild(div);
+        changed = true;
+      });
+    }
+  }
+
+  function applyAlignment(align) {
+    focusEditor();
+    let blocks = getSelectedTopBlocks();
+
+    if (!blocks.length) {
+      document.execCommand("formatBlock", false, "p");
+      blocks = getSelectedTopBlocks();
+    }
+
+    blocks.forEach((block) => {
+      if (align === "left") {
+        block.style.textAlign = "";
+        block.removeAttribute("align");
+      } else {
+        block.style.textAlign = align;
+        block.removeAttribute("align");
+      }
+      clearDescendantAlign(block);
+      unwrapRedundantAlignDivs(block);
+    });
+  }
+
+  function updateToolbarState() {
+    document.querySelectorAll(".tool-btn[data-cmd]").forEach((btn) => {
+      const cmd = btn.dataset.cmd;
+      let active = false;
+
+      if (ALIGN_COMMANDS[cmd]) {
+        const blocks = getSelectedTopBlocks();
+        if (blocks.length) {
+          const wanted = ALIGN_COMMANDS[cmd];
+          active = blocks.every((block) => {
+            const current = getTextAlign(block) || "left";
+            return current === wanted;
+          });
+        }
+      } else {
+        try {
+          active = document.queryCommandState(cmd);
+        } catch (_) {
+          active = false;
+        }
+      }
+
+      btn.classList.toggle("is-active", active);
+    });
+  }
+
+  function normalizeAlign(value) {
+    if (!value) return null;
+    const key = String(value).toLowerCase().trim();
+    return ALIGN_MAP[key] || null;
+  }
+
+  function getTextAlign(el) {
+    if (!(el instanceof HTMLElement)) return null;
+    const inline = normalizeAlign(el.style && el.style.textAlign);
+    if (inline) return inline;
+    const attr = normalizeAlign(el.getAttribute("align"));
+    if (attr) return attr;
+
+    // FanFiktion.de and similar pages often use class-based centering
+    const className = typeof el.className === "string" ? el.className : "";
+    if (/\b(center|centered|text-center)\b/i.test(className)) return "center";
+    if (/\b(text-right|align-right)\b/i.test(className)) return "right";
+    if (/\b(text-left|align-left)\b/i.test(className)) return "left";
+
+    if (el.tagName === "CENTER") return "center";
+    return null;
+  }
+
+  function isBlockElement(node) {
+    if (!(node instanceof HTMLElement)) return false;
+    const tag = node.tagName;
+    return (
+      tag === "P" ||
+      tag === "DIV" ||
+      tag === "LI" ||
+      tag === "H1" ||
+      tag === "H2" ||
+      tag === "H3" ||
+      tag === "H4" ||
+      tag === "H5" ||
+      tag === "H6" ||
+      tag === "BLOCKQUOTE" ||
+      tag === "CENTER" ||
+      tag === "SECTION" ||
+      tag === "ARTICLE"
+    );
+  }
+
+  function escapePlain(text) {
+    return text.replace(/\u00a0/g, " ");
+  }
+
+  function wrapStyle(type, content) {
+    if (!content) return "";
+    return `[style type="${type}"]${content}[/style]`;
+  }
+
+  function wrapAlign(type, content) {
+    if (!content) return "";
+    if (!type || type === "left") return content;
+    return `[align type="${type}"]${content}[/align]`;
+  }
+
+  function normalizeHref(href) {
+    if (!href) return null;
+    const url = String(href).trim();
+    if (!url) return null;
+    const lower = url.toLowerCase();
+    if (lower.startsWith("javascript:") || lower.startsWith("data:")) return null;
+    if (url === "#") return null;
+    return url;
+  }
+
+  function wrapLink(href, content) {
+    if (!content) return "";
+    if (!href) return content;
+    const safe = href.replace(/"/g, "%22");
+    return `[link href="${safe}"]${content}[/link]`;
+  }
+
+  // Collect only inline content (no new lines) – used inside <a> tags
+  function collectInlineContent(el, marks) {
+    let out = "";
+
+    function walkInline(node, currentMarks) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        let text = escapePlain(node.nodeValue || "");
+        if (!text) return;
+        text = text.replace(/\s*\r?\n\s*/g, " ");
+        if (/^\s*$/.test(text)) {
+          if (out) out += " ";
+          return;
+        }
+        out += applyMarks(text, currentMarks);
+        return;
+      }
+
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      const tag = node.tagName;
+      if (tag === "SCRIPT" || tag === "STYLE") return;
+      if (tag === "BR") {
+        if (out) out += " ";
+        return;
+      }
+
+      // Nested anchors: keep text only, outer link wins
+      const nextMarks = collectMarksFromElement(node, currentMarks);
+      Array.from(node.childNodes).forEach((child) => walkInline(child, nextMarks));
+    }
+
+    Array.from(el.childNodes).forEach((child) => walkInline(child, marks));
+    return out.replace(/^[ \t]+|[ \t]+$/g, "");
+  }
+
+  function mergeAdjacentStyles(text) {
+    // Collapse adjacent identical style tags, also across single newlines
+    let prev;
+    do {
+      prev = text;
+      text = text.replace(
+        /\[style type="(bold|italic|underlined|linethrough)"\]([\s\S]*?)\[\/style\]([ \t]*\n?[ \t]*)\[style type="\1"\]([\s\S]*?)\[\/style\]/g,
+        '[style type="$1"]$2$3$4[/style]'
+      );
+    } while (text !== prev);
+    return text;
+  }
+
+  function unwrapElement(el) {
+    const parent = el.parentNode;
+    if (!parent) return;
+    while (el.firstChild) parent.insertBefore(el.firstChild, el);
+    parent.removeChild(el);
+  }
+
+  function nearestBlockAncestor(el, root) {
+    let node = el.parentElement;
+    while (node && node !== root && !isBlockElement(node)) node = node.parentElement;
+    return node === root ? null : node;
+  }
+
+  function wrapAllInBlock(root, align) {
+    const existing = root.children.length === 1 ? root.firstElementChild : null;
+    if (existing && isBlockElement(existing) && getTextAlign(existing) === align) {
+      return existing;
+    }
+    const block = document.createElement("div");
+    block.style.textAlign = align;
+    while (root.firstChild) block.appendChild(root.firstChild);
+    root.appendChild(block);
+    return block;
+  }
+
+  // Selecting text inside a centered paragraph makes the browser keep the
+  // alignment only on inline wrappers, where text-align has no effect.
+  // Move it onto a real block so the editor shows it too.
+  function liftInlineAlignment(root) {
+    Array.from(root.querySelectorAll("*")).forEach((el) => {
+      if (!(el instanceof HTMLElement) || !root.contains(el)) return;
+      if (isBlockElement(el)) return;
+
+      const align = getTextAlign(el);
+      if (!align || align === "left") return;
+
+      const block = nearestBlockAncestor(el, root) || wrapAllInBlock(root, align);
+      const blockAlign = getTextAlign(block);
+
+      if (!blockAlign) {
+        block.style.textAlign = align;
+        el.style.textAlign = "";
+      } else if (blockAlign === align) {
+        el.style.textAlign = "";
+      }
+    });
+  }
+
+  function cleanPastedHtml(root) {
+    // Google Docs wraps the whole paste in <b id="docs-internal-guid-...">
+    root
+      .querySelectorAll('b[id^="docs-internal-guid"], span[id^="docs-internal-guid"]')
+      .forEach(unwrapElement);
+
+    // Strip noisy attrs and spacing styles; alignment and text styles stay
+    root.querySelectorAll("*").forEach((el) => {
+      if (!(el instanceof HTMLElement)) return;
+      ["id", "dir", "role"].forEach((attr) => el.removeAttribute(attr));
+      Array.from(el.attributes).forEach((attr) => {
+        if (attr.name.startsWith("data-")) el.removeAttribute(attr.name);
+      });
+
+      if (el.style) {
+        [
+          "margin",
+          "marginTop",
+          "marginBottom",
+          "marginLeft",
+          "marginRight",
+          "padding",
+          "paddingTop",
+          "paddingBottom",
+          "lineHeight",
+          "minHeight",
+          "height",
+        ].forEach((prop) => {
+          el.style[prop] = "";
+        });
+        if (!(el.getAttribute("style") || "").trim()) el.removeAttribute("style");
+      }
+    });
+
+    // FanFiktion.de sprinkles empty bookmark spans between the lines
+    Array.from(root.querySelectorAll("span")).forEach((el) => {
+      if (!el.childNodes.length) el.remove();
+    });
+
+    liftInlineAlignment(root);
+
+    // Indentation between block elements would render as blank lines (pre-wrap)
+    const whitespaceNodes = [];
+    const textWalker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    while (textWalker.nextNode()) {
+      const node = textWalker.currentNode;
+      if (!/^\s*$/.test(node.nodeValue || "")) continue;
+      const parent = node.parentNode;
+      if (parent && Array.from(parent.children).some(isBlockElement)) {
+        whitespaceNodes.push(node);
+      }
+    }
+    whitespaceNodes.forEach((node) => node.parentNode.removeChild(node));
+  }
+
+  function collectMarksFromElement(el, marks) {
+    const next = { ...marks };
+    const tag = el.tagName;
+
+    if (tag === "B" || tag === "STRONG") next.bold = true;
+    if (tag === "I" || tag === "EM") next.italic = true;
+    if (tag === "U") next.underline = true;
+    if (tag === "S" || tag === "STRIKE" || tag === "DEL") next.strike = true;
+
+    if (tag === "SPAN" || tag === "FONT") {
+      const weight = (el.style.fontWeight || "").toString();
+      const style = (el.style.fontStyle || "").toString();
+      const deco = (el.style.textDecoration || el.style.textDecorationLine || "").toString();
+
+      if (weight === "bold" || weight === "700" || parseInt(weight, 10) >= 600) {
+        next.bold = true;
+      }
+      if (style === "italic" || style === "oblique") next.italic = true;
+      if (deco.includes("underline")) next.underline = true;
+      if (deco.includes("line-through")) next.strike = true;
+    }
+
+    return next;
+  }
+
+  function applyMarks(text, marks) {
+    let out = text;
+    // Nesting order: align is applied at block level; here only styles.
+    // Documented FF example nests style outside align when both wrap same text;
+    // for inline we only emit style tags. Order: bold > italic > underline > strike
+    // so output is predictable.
+    if (marks.strike) out = wrapStyle(STYLE_MAP.strike, out);
+    if (marks.underline) out = wrapStyle(STYLE_MAP.underline, out);
+    if (marks.italic) out = wrapStyle(STYLE_MAP.italic, out);
+    if (marks.bold) out = wrapStyle(STYLE_MAP.bold, out);
+    return out;
+  }
+
+  // The export works on visual lines: <br> always starts a new line, a block
+  // element only starts one when the current line already holds content. That
+  // way "one paragraph per line" (Google Docs) and "<br> per line"
+  // (FanFiktion.de) produce the same result.
+  function collectLines(root) {
+    const lines = [];
+    let current = null;
+
+    function newLine(align) {
+      current = { align: align || null, text: "" };
+      lines.push(current);
+      return current;
+    }
+
+    function softBreak(align) {
+      if (!current || current.text) newLine(align);
+      else if (align && !current.align) current.align = align;
+    }
+
+    function write(text, align) {
+      if (!current) newLine(align);
+      else if (align && !current.align) current.align = align;
+      current.text += text;
+    }
+
+    function walk(node, marks, align) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        let text = escapePlain(node.nodeValue || "");
+        if (!text) return;
+        // Newlines inside the source HTML are indentation, not line breaks
+        text = text.replace(/\s*\r?\n\s*/g, " ");
+        if (/^\s*$/.test(text)) {
+          // Keep a separating space between inline elements, drop the rest
+          if (current && current.text) write(" ", align);
+          return;
+        }
+        write(applyMarks(text, marks), align);
+        return;
+      }
+
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+      const el = node;
+      const tag = el.tagName;
+      if (tag === "SCRIPT" || tag === "STYLE") return;
+
+      const ownAlign = getTextAlign(el) || align || null;
+
+      if (tag === "BR") {
+        newLine(ownAlign);
+        return;
+      }
+
+      if (tag === "A") {
+        const href = normalizeHref(el.getAttribute("href"));
+        const nextMarks = collectMarksFromElement(el, marks);
+        const inner = collectInlineContent(el, nextMarks);
+        if (inner) write(wrapLink(href, inner), ownAlign);
+        return;
+      }
+
+      const block = isBlockElement(el);
+      if (block) softBreak(ownAlign);
+
+      const nextMarks = collectMarksFromElement(el, marks);
+      Array.from(el.childNodes).forEach((child) => walk(child, nextMarks, ownAlign));
+
+      if (block) softBreak(ownAlign);
+    }
+
+    Array.from(root.childNodes).forEach((child) => walk(child, {}, null));
+
+    return lines.map((line) => ({
+      align: line.align,
+      text: line.text.replace(/[ \t]+$/, ""),
+    }));
+  }
+
+  // Consecutive lines sharing an alignment go into one [align] block
+  function renderLines(lines) {
+    const out = [];
+    let group = null;
+    let blanks = 0;
+
+    function flushGroup() {
+      if (!group) return;
+      out.push(wrapAlign(group.align, group.items.join("\n")));
+      group = null;
+    }
+
+    lines.forEach((line) => {
+      if (!line.text) {
+        blanks += 1;
+        return;
+      }
+
+      const align = line.align && line.align !== "left" ? line.align : null;
+
+      if (group && group.align === align) {
+        if (blanks) group.items.push("");
+      } else {
+        flushGroup();
+        if (blanks && out.length) out.push("");
+        group = { align: align, items: [] };
+      }
+
+      blanks = 0;
+      group.items.push(line.text);
+    });
+
+    flushGroup();
+    return out.join("\n");
+  }
+
+  function htmlToFanfiktion(root) {
+    const result = renderLines(collectLines(root));
+    return mergeAdjacentStyles(result).replace(/\n{3,}/g, "\n\n").trim();
+  }
+
+  function exportText() {
+    const converted = htmlToFanfiktion(editor);
+    output.value = converted;
+    btnCopy.disabled = !converted;
+    if (!converted) {
+      setStatus("Nichts zu exportieren – schreibe zuerst etwas.", true);
+    } else {
+      setStatus("Export fertig. Du kannst den Text jetzt kopieren.");
+    }
+  }
+
+  async function copyOutput() {
+    const text = output.value;
+    if (!text) {
+      setStatus("Zuerst exportieren.", true);
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setStatus("In die Zwischenablage kopiert.");
+    } catch (_) {
+      output.focus();
+      output.select();
+      const ok = document.execCommand("copy");
+      setStatus(
+        ok ? "In die Zwischenablage kopiert." : "Kopieren fehlgeschlagen – bitte manuell markieren.",
+        !ok
+      );
+    }
+  }
+
+  function clearEditor() {
+    resetEditorShell();
+    output.value = "";
+    btnCopy.disabled = true;
+    setStatus("Editor geleert.");
+  }
+
+  function resetEditorShell() {
+    editor.innerHTML = "<p><br></p>";
+    placeCaretAtStart();
+  }
+
+  function placeCaretAtStart() {
+    editor.focus();
+    const sel = window.getSelection();
+    if (!sel) return;
+    const range = document.createRange();
+    const block = editor.firstChild || editor;
+    range.setStart(block, 0);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  function placeCaretAtEnd() {
+    editor.focus();
+    const sel = window.getSelection();
+    if (!sel) return;
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  function isEditorEffectivelyEmpty() {
+    return !(editor.textContent || "").replace(/\u00a0/g, " ").trim();
+  }
+
+  function hasAlignmentInfo(root) {
+    return Array.from(root.querySelectorAll("*")).some((el) => {
+      const align = getTextAlign(el);
+      return align && align !== "left";
+    });
+  }
+
+  function showPasteDiagnostics() {
+    if (!lastPaste) {
+      setStatus("Noch nichts eingefügt – zuerst Text einfügen.", true);
+      return;
+    }
+
+    output.value = [
+      "=== Zwischenablage (HTML) ===",
+      lastPaste.clipboardHtml || "(kein HTML, nur reiner Text)",
+      "",
+      "=== Nach der Bereinigung ===",
+      lastPaste.cleanedHtml || "(leer)",
+      "",
+      "=== Editor danach ===",
+      lastPaste.editorHtml || "(leer)",
+    ].join("\n");
+    btnCopy.disabled = false;
+    setStatus("Diagnose angezeigt – du kannst sie kopieren.");
+  }
+
+  function saveSelection() {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) {
+      savedSelection = null;
+      return;
+    }
+    const range = sel.getRangeAt(0);
+    if (!editor.contains(range.commonAncestorContainer) && range.commonAncestorContainer !== editor) {
+      savedSelection = null;
+      return;
+    }
+    savedSelection = range.cloneRange();
+  }
+
+  function restoreSelection() {
+    if (!savedSelection) return false;
+    const sel = window.getSelection();
+    if (!sel) return false;
+    sel.removeAllRanges();
+    sel.addRange(savedSelection);
+    return true;
+  }
+
+  function getSelectedPlainText() {
+    if (!savedSelection) return "";
+    return (savedSelection.toString() || "").replace(/\u00a0/g, " ").trim();
+  }
+
+  function openLinkModal() {
+    if (!linkModal) return;
+    saveSelection();
+    const selected = getSelectedPlainText();
+    linkTextInput.value = selected;
+    linkUrlInput.value = "";
+    linkError.hidden = true;
+    linkError.textContent = "";
+    linkModal.hidden = false;
+    (selected ? linkUrlInput : linkTextInput).focus();
+  }
+
+  function closeLinkModal() {
+    if (!linkModal) return;
+    linkModal.hidden = true;
+    linkError.hidden = true;
+    focusEditor();
+    restoreSelection();
+  }
+
+  function ensureAbsoluteUrl(url) {
+    const trimmed = String(url || "").trim();
+    if (!trimmed) return "";
+    if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)) return trimmed;
+    return "https://" + trimmed;
+  }
+
+  function insertLinkFromModal() {
+    const label = (linkTextInput.value || "").trim();
+    const href = normalizeHref(ensureAbsoluteUrl(linkUrlInput.value));
+
+    if (!label) {
+      linkError.textContent = "Bitte einen Anzeigetext eingeben.";
+      linkError.hidden = false;
+      linkTextInput.focus();
+      return;
+    }
+    if (!href) {
+      linkError.textContent = "Bitte eine gültige URL eingeben.";
+      linkError.hidden = false;
+      linkUrlInput.focus();
+      return;
+    }
+
+    const safeHref = href.replace(/"/g, "&quot;");
+    const safeLabel = label
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    const html = `<a href="${safeHref}">${safeLabel}</a>`;
+
+    focusEditor();
+    restoreSelection();
+
+    if (!document.execCommand("insertHTML", false, html)) {
+      const anchor = document.createElement("a");
+      anchor.href = href;
+      anchor.textContent = label;
+      if (savedSelection) {
+        savedSelection.deleteContents();
+        savedSelection.insertNode(anchor);
+      } else if (isEditorEffectivelyEmpty()) {
+        editor.innerHTML = "";
+        const p = document.createElement("p");
+        p.appendChild(anchor);
+        editor.appendChild(p);
+      } else {
+        editor.appendChild(anchor);
+      }
+    }
+
+    linkModal.hidden = true;
+    linkError.hidden = true;
+    savedSelection = null;
+    setStatus("Link eingefügt.");
+    updateToolbarState();
+  }
+
+  // Toolbar
+  document.querySelectorAll(".tool-btn[data-cmd]").forEach((btn) => {
+    btn.addEventListener("mousedown", (e) => e.preventDefault());
+    btn.addEventListener("click", () => runCommand(btn.dataset.cmd));
+  });
+
+  if (btnLink) {
+    btnLink.addEventListener("mousedown", (e) => e.preventDefault());
+    btnLink.addEventListener("click", openLinkModal);
+  }
+  if (linkInsertBtn) linkInsertBtn.addEventListener("click", insertLinkFromModal);
+  if (linkModal) {
+    linkModal.querySelectorAll("[data-close-modal]").forEach((el) => {
+      el.addEventListener("click", closeLinkModal);
+    });
+    linkModal.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeLinkModal();
+      } else if (e.key === "Enter" && e.target.tagName === "INPUT") {
+        e.preventDefault();
+        insertLinkFromModal();
+      }
+    });
+  }
+
+  btnClear.addEventListener("click", clearEditor);
+  btnExport.addEventListener("click", exportText);
+  btnCopy.addEventListener("click", copyOutput);
+  btnDebug.addEventListener("click", showPasteDiagnostics);
+
+  editor.addEventListener("keyup", updateToolbarState);
+  editor.addEventListener("mouseup", updateToolbarState);
+  editor.addEventListener("focus", updateToolbarState);
+
+  // Prefer HTML paste, strip scripts/styles from Word/Docs clutter
+  editor.addEventListener("paste", (e) => {
+    const html = e.clipboardData && e.clipboardData.getData("text/html");
+    const plain = e.clipboardData && e.clipboardData.getData("text/plain");
+    if (!html && !plain) return;
+
+    e.preventDefault();
+    lastPaste = { clipboardHtml: html || "", cleanedHtml: "", editorHtml: "" };
+
+    if (html) {
+      const tmp = document.createElement("div");
+      tmp.innerHTML = html;
+      tmp.querySelectorAll("script, style, meta, link").forEach((n) => n.remove());
+      const walker = document.createTreeWalker(tmp, NodeFilter.SHOW_COMMENT);
+      const comments = [];
+      while (walker.nextNode()) comments.push(walker.currentNode);
+      comments.forEach((c) => c.remove());
+      cleanPastedHtml(tmp);
+      lastPaste.cleanedHtml = tmp.innerHTML;
+
+      // Copying only part of a paragraph drops its alignment in the clipboard
+      if (/usercontent|user-formatted/i.test(html) && !hasAlignmentInfo(tmp)) {
+        lastPaste.hint =
+          "Hinweis: Bei einem Teilabschnitt liefert der Browser die Ausrichtung nicht mit. " +
+          "War der Text zentriert? Dann markieren und auf „Zentriert“ klicken.";
+      }
+
+      // Replacing beats insertHTML into an empty editor: no leftover shells
+      if (isEditorEffectivelyEmpty()) {
+        editor.innerHTML = tmp.innerHTML || "<p><br></p>";
+        placeCaretAtEnd();
+      } else {
+        document.execCommand("insertHTML", false, tmp.innerHTML);
+      }
+    } else if (isEditorEffectivelyEmpty()) {
+      editor.innerHTML = "";
+      document.execCommand("insertText", false, plain);
+      if (isEditorEffectivelyEmpty()) resetEditorShell();
+    } else {
+      document.execCommand("insertText", false, plain);
+    }
+
+    lastPaste.editorHtml = editor.innerHTML;
+    if (lastPaste.hint) setStatus(lastPaste.hint);
+    updateToolbarState();
+  });
+
+  // Seed empty paragraph so formatting applies cleanly
+  resetEditorShell();
+})();
+
+</script>
+</body>
+</html>
