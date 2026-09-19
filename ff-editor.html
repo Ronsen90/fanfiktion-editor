@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
@@ -563,6 +563,7 @@ body {
         <button type="button" class="link-btn" id="btn-debug">
           Diagnose: zeigen, was beim letzten Einfügen ankam
         </button>
+        &middot; Version 2026-09-19c
       </p>
     </footer>
   </div>
@@ -817,11 +818,6 @@ body {
     return text.replace(/\u00a0/g, " ");
   }
 
-  function wrapStyle(type, content) {
-    if (!content) return "";
-    return `[style type="${type}"]${content}[/style]`;
-  }
-
   function wrapAlign(type, content) {
     if (!content) return "";
     if (!type || type === "left") return content;
@@ -846,8 +842,8 @@ body {
   }
 
   // Collect only inline content (no new lines) – used inside <a> tags
-  function collectInlineContent(el, marks) {
-    let out = "";
+  function collectAnchorRuns(el, marks) {
+    const runs = [];
 
     function walkInline(node, currentMarks) {
       if (node.nodeType === Node.TEXT_NODE) {
@@ -855,10 +851,10 @@ body {
         if (!text) return;
         text = text.replace(/\s*\r?\n\s*/g, " ");
         if (/^\s*$/.test(text)) {
-          if (out) out += " ";
+          if (runs.length) runs.push({ text: " ", neutral: true });
           return;
         }
-        out += applyMarks(text, currentMarks);
+        runs.push({ text: text, marks: currentMarks });
         return;
       }
 
@@ -866,7 +862,7 @@ body {
       const tag = node.tagName;
       if (tag === "SCRIPT" || tag === "STYLE") return;
       if (tag === "BR") {
-        if (out) out += " ";
+        if (runs.length) runs.push({ text: " ", neutral: true });
         return;
       }
 
@@ -876,20 +872,7 @@ body {
     }
 
     Array.from(el.childNodes).forEach((child) => walkInline(child, marks));
-    return out.replace(/^[ \t]+|[ \t]+$/g, "");
-  }
-
-  function mergeAdjacentStyles(text) {
-    // Collapse adjacent identical style tags, also across single newlines
-    let prev;
-    do {
-      prev = text;
-      text = text.replace(
-        /\[style type="(bold|italic|underlined|linethrough)"\]([\s\S]*?)\[\/style\]([ \t]*\n?[ \t]*)\[style type="\1"\]([\s\S]*?)\[\/style\]/g,
-        '[style type="$1"]$2$3$4[/style]'
-      );
-    } while (text !== prev);
-    return text;
+    return trimRuns(runs);
   }
 
   function unwrapElement(el) {
@@ -1020,17 +1003,102 @@ body {
     return next;
   }
 
-  function applyMarks(text, marks) {
-    let out = text;
-    // Nesting order: align is applied at block level; here only styles.
-    // Documented FF example nests style outside align when both wrap same text;
-    // for inline we only emit style tags. Order: bold > italic > underline > strike
-    // so output is predictable.
-    if (marks.strike) out = wrapStyle(STYLE_MAP.strike, out);
-    if (marks.underline) out = wrapStyle(STYLE_MAP.underline, out);
-    if (marks.italic) out = wrapStyle(STYLE_MAP.italic, out);
-    if (marks.bold) out = wrapStyle(STYLE_MAP.bold, out);
+  // Nesting order from outside to inside, so output stays predictable
+  const MARK_ORDER = ["bold", "italic", "underline", "strike"];
+
+  function activeMarks(marks) {
+    return MARK_ORDER.filter((name) => marks && marks[name]);
+  }
+
+  function subtractMarks(marks, base) {
+    const out = {};
+    MARK_ORDER.forEach((name) => {
+      if (marks && marks[name] && !(base && base[name])) out[name] = true;
+    });
     return out;
+  }
+
+  function runsText(runs) {
+    return runs.map((run) => run.text).join("");
+  }
+
+  function runsHaveText(runs) {
+    return /\S/.test(runsText(runs));
+  }
+
+  function trimRuns(runs) {
+    const out = runs.slice();
+
+    while (out.length) {
+      const first = out[0];
+      const trimmed = first.text.replace(/^[ \t]+/, "");
+      if (trimmed === first.text) break;
+      if (!trimmed) {
+        out.shift();
+        continue;
+      }
+      out[0] = { ...first, text: trimmed };
+      break;
+    }
+
+    while (out.length) {
+      const last = out[out.length - 1];
+      const trimmed = last.text.replace(/[ \t]+$/, "");
+      if (trimmed === last.text) break;
+      if (!trimmed) {
+        out.pop();
+        continue;
+      }
+      out[out.length - 1] = { ...last, text: trimmed };
+      break;
+    }
+
+    return out;
+  }
+
+  // Turn a sequence of styled runs into tags. A style stays open while the
+  // following runs still carry it, so neighbouring runs that share e.g. bold
+  // produce one tag pair instead of several that could be mismatched later.
+  function renderRuns(runs) {
+    let out = "";
+    let pending = "";
+    const open = [];
+
+    function closeTo(depth) {
+      for (let i = open.length - 1; i >= depth; i -= 1) out += "[/style]";
+      open.length = depth;
+    }
+
+    runs.forEach((run) => {
+      if (!run.text) return;
+
+      // Separators (spaces, line breaks) land inside the styles that continue
+      // and outside those that end here, so no tag encloses a dangling break
+      if (run.neutral) {
+        pending += run.text;
+        return;
+      }
+
+      const active = activeMarks(run.marks);
+      let shared = 0;
+      while (shared < open.length && shared < active.length && open[shared] === active[shared]) {
+        shared += 1;
+      }
+
+      closeTo(shared);
+      out += pending;
+      pending = "";
+
+      for (let i = shared; i < active.length; i += 1) {
+        out += `[style type="${STYLE_MAP[active[i]]}"]`;
+        open.push(active[i]);
+      }
+
+      out += run.text;
+    });
+
+    closeTo(0);
+    return out + pending;
   }
 
   // The export works on visual lines: <br> always starts a new line, a block
@@ -1042,20 +1110,20 @@ body {
     let current = null;
 
     function newLine(align) {
-      current = { align: align || null, text: "" };
+      current = { align: align || null, runs: [] };
       lines.push(current);
       return current;
     }
 
     function softBreak(align) {
-      if (!current || current.text) newLine(align);
+      if (!current || current.runs.length) newLine(align);
       else if (align && !current.align) current.align = align;
     }
 
-    function write(text, align) {
+    function write(run, align) {
       if (!current) newLine(align);
       else if (align && !current.align) current.align = align;
-      current.text += text;
+      current.runs.push(run);
     }
 
     function walk(node, marks, align) {
@@ -1066,10 +1134,10 @@ body {
         text = text.replace(/\s*\r?\n\s*/g, " ");
         if (/^\s*$/.test(text)) {
           // Keep a separating space between inline elements, drop the rest
-          if (current && current.text) write(" ", align);
+          if (current && current.runs.length) write({ text: " ", neutral: true }, align);
           return;
         }
-        write(applyMarks(text, marks), align);
+        write({ text: text, marks: marks }, align);
         return;
       }
 
@@ -1089,8 +1157,15 @@ body {
       if (tag === "A") {
         const href = normalizeHref(el.getAttribute("href"));
         const nextMarks = collectMarksFromElement(el, marks);
-        const inner = collectInlineContent(el, nextMarks);
-        if (inner) write(wrapLink(href, inner), ownAlign);
+        const innerRuns = collectAnchorRuns(el, nextMarks);
+        // Styles the link shares with its surroundings stay outside the [link]
+        // tag, only extra styles are emitted inside it
+        const inner = renderRuns(
+          innerRuns.map((run) =>
+            run.neutral ? run : { ...run, marks: subtractMarks(run.marks, marks) }
+          )
+        );
+        if (inner) write({ text: wrapLink(href, inner), marks: marks }, ownAlign);
         return;
       }
 
@@ -1107,8 +1182,19 @@ body {
 
     return lines.map((line) => ({
       align: line.align,
-      text: line.text.replace(/[ \t]+$/, ""),
+      runs: trimRuns(line.runs),
     }));
+  }
+
+  // Neighbouring lines are rendered together so a style spanning several lines
+  // opens only once; a blank line ends such a block.
+  function renderChunk(chunk) {
+    const runs = [];
+    chunk.forEach((lineRuns, index) => {
+      if (index > 0) runs.push({ text: "\n", neutral: true });
+      lineRuns.forEach((run) => runs.push(run));
+    });
+    return renderRuns(runs);
   }
 
   // Consecutive lines sharing an alignment go into one [align] block
@@ -1119,12 +1205,12 @@ body {
 
     function flushGroup() {
       if (!group) return;
-      out.push(wrapAlign(group.align, group.items.join("\n")));
+      out.push(wrapAlign(group.align, group.chunks.map(renderChunk).join("\n\n")));
       group = null;
     }
 
     lines.forEach((line) => {
-      if (!line.text) {
+      if (!runsHaveText(line.runs)) {
         blanks += 1;
         return;
       }
@@ -1132,15 +1218,15 @@ body {
       const align = line.align && line.align !== "left" ? line.align : null;
 
       if (group && group.align === align) {
-        if (blanks) group.items.push("");
+        if (blanks) group.chunks.push([]);
       } else {
         flushGroup();
         if (blanks && out.length) out.push("");
-        group = { align: align, items: [] };
+        group = { align: align, chunks: [[]] };
       }
 
       blanks = 0;
-      group.items.push(line.text);
+      group.chunks[group.chunks.length - 1].push(line.runs);
     });
 
     flushGroup();
@@ -1148,8 +1234,7 @@ body {
   }
 
   function htmlToFanfiktion(root) {
-    const result = renderLines(collectLines(root));
-    return mergeAdjacentStyles(result).replace(/\n{3,}/g, "\n\n").trim();
+    return renderLines(collectLines(root)).replace(/\n{3,}/g, "\n\n").trim();
   }
 
   function exportText() {
