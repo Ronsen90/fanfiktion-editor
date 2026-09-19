@@ -563,7 +563,7 @@ body {
         <button type="button" class="link-btn" id="btn-debug">
           Diagnose: zeigen, was beim letzten Einfügen ankam
         </button>
-        &middot; Version 2026-09-19c
+        &middot; Version 2026-09-20a
       </p>
     </footer>
   </div>
@@ -1116,8 +1116,11 @@ body {
     }
 
     function softBreak(align) {
+      // A still empty line belongs to the block that is starting now, so it
+      // takes over its alignment – including "no alignment", otherwise a
+      // centered paragraph would hand its alignment to the next one.
       if (!current || current.runs.length) newLine(align);
-      else if (align && !current.align) current.align = align;
+      else current.align = align || null;
     }
 
     function write(run, align) {
@@ -1128,13 +1131,19 @@ body {
 
     function walk(node, marks, align) {
       if (node.nodeType === Node.TEXT_NODE) {
-        let text = escapePlain(node.nodeValue || "");
+        const raw = node.nodeValue || "";
+        let text = escapePlain(raw);
         if (!text) return;
         // Newlines inside the source HTML are indentation, not line breaks
         text = text.replace(/\s*\r?\n\s*/g, " ");
         if (/^\s*$/.test(text)) {
-          // Keep a separating space between inline elements, drop the rest
-          if (current && current.runs.length) write({ text: " ", neutral: true }, align);
+          // A non-breaking space is deliberate content – Word builds empty
+          // paragraphs that way – so such a line has to survive as a blank
+          // line. Plain indentation only separates inline elements.
+          const deliberate = raw.indexOf("\u00a0") !== -1;
+          if (deliberate || (current && current.runs.length)) {
+            write({ text: " ", neutral: true }, align);
+          }
           return;
         }
         write({ text: text, marks: marks }, align);
