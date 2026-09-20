@@ -1075,6 +1075,10 @@ body {
       if (!el.childNodes.length) el.remove();
     });
 
+    // Papyrus u. a.: Zeilenumbrüche oft als echte \n in Textknoten (sichtbar
+    // nur wegen pre-wrap) → in <br> überführen, damit Absätze echte Struktur haben
+    expandTextNewlines(root);
+
     liftInlineAlignment(root);
 
     // Indentation between block elements would render as blank lines (pre-wrap)
@@ -1089,6 +1093,51 @@ body {
       }
     }
     whitespaceNodes.forEach((node) => node.parentNode.removeChild(node));
+  }
+
+  function expandTextNewlines(root) {
+    const nodes = [];
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+
+    nodes.forEach((node) => {
+      const raw = node.nodeValue || "";
+      if (!/\r?\n/.test(raw)) return;
+      // Reiner Einrückungs-Whitespace zwischen Tags → nicht anfassen
+      if (!/\S/.test(raw.replace(/\u00a0/g, " "))) return;
+      if (node.parentElement && node.parentElement.closest("pre")) return;
+
+      const parts = raw.split(/\r?\n/);
+      const frag = document.createDocumentFragment();
+      parts.forEach((part, index) => {
+        if (index > 0) frag.appendChild(document.createElement("br"));
+        if (part.length) frag.appendChild(document.createTextNode(part));
+      });
+      node.parentNode.replaceChild(frag, node);
+    });
+  }
+
+  function escapeHtmlText(text) {
+    return String(text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  // Reiner Text (Papyrus-Clipboard ohne HTML): jede Zeile = Absatz
+  function plainTextToEditorHtml(plain) {
+    const lines = String(plain || "")
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
+      .split("\n");
+    if (lines.length && lines[lines.length - 1] === "") lines.pop();
+    if (!lines.length) return "<p><br></p>";
+    return lines
+      .map((line) => {
+        if (!line.replace(/\u00a0/g, " ").trim()) return "<p><br></p>";
+        return `<p>${escapeHtmlText(line)}</p>`;
+      })
+      .join("");
   }
 
   function collectMarksFromElement(el, marks) {
@@ -1215,10 +1264,10 @@ body {
     return out + pending;
   }
 
-  // The export works on visual lines: <br> always starts a new line, a block
-  // element only starts one when the current line already holds content. That
-  // way "one paragraph per line" (Google Docs) and "<br> per line"
-  // (FanFiktion.de) produce the same result.
+  // The export works on visual lines: <br> and real \n in text nodes start a
+  // new line; a block element only starts one when the current line already
+  // holds content. That way "one paragraph per line" (Google Docs / Papyrus),
+  // "<br> per line" (FanFiktion.de) and pre-wrap newlines produce the same result.
   function collectLines(root) {
     const lines = [];
     let current = null;
@@ -1246,21 +1295,27 @@ body {
     function walk(node, marks, align) {
       if (node.nodeType === Node.TEXT_NODE) {
         const raw = node.nodeValue || "";
-        let text = escapePlain(raw);
-        if (!text) return;
-        // Newlines inside the source HTML are indentation, not line breaks
-        text = text.replace(/\s*\r?\n\s*/g, " ");
-        if (/^\s*$/.test(text)) {
-          // A non-breaking space is deliberate content – Word builds empty
-          // paragraphs that way – so such a line has to survive as a blank
-          // line. Plain indentation only separates inline elements.
-          const deliberate = raw.indexOf("\u00a0") !== -1;
-          if (deliberate || (current && current.runs.length)) {
-            write({ text: " ", neutral: true }, align);
+        if (!raw) return;
+
+        // Papyrus (und reiner Text) liefert echte \n; der Editor zeigt sie per
+        // pre-wrap – der Export muss sie als Zeilen behandeln, nicht verwerfen.
+        const parts = raw.split(/\r?\n/);
+        parts.forEach((part, index) => {
+          if (index > 0) softBreak(align);
+
+          let text = escapePlain(part);
+          if (!text) return;
+
+          if (/^\s*$/.test(text)) {
+            // nbsp = bewusster Leerabsatz; sonst nur Abstand innerhalb der Zeile
+            const deliberate = part.indexOf("\u00a0") !== -1;
+            if (deliberate || (current && current.runs.length)) {
+              write({ text: " ", neutral: true }, align);
+            }
+            return;
           }
-          return;
-        }
-        write({ text: text, marks: marks }, align);
+          write({ text: text, marks: marks }, align);
+        });
         return;
       }
 
@@ -1633,12 +1688,16 @@ body {
       } else {
         document.execCommand("insertHTML", false, tmp.innerHTML);
       }
-    } else if (isEditorEffectivelyEmpty()) {
-      editor.innerHTML = "";
-      document.execCommand("insertText", false, plain);
-      if (isEditorEffectivelyEmpty()) resetEditorShell();
     } else {
-      document.execCommand("insertText", false, plain);
+      const asHtml = plainTextToEditorHtml(plain);
+      lastPaste.cleanedHtml = asHtml;
+      if (isEditorEffectivelyEmpty()) {
+        editor.innerHTML = asHtml;
+        placeCaretAtEnd();
+      } else {
+        document.execCommand("insertHTML", false, asHtml);
+      }
+      if (isEditorEffectivelyEmpty()) resetEditorShell();
     }
 
     lastPaste.editorHtml = editor.innerHTML;
