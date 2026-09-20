@@ -235,6 +235,11 @@ body {
   text-underline-offset: 2px;
 }
 
+.editor ins {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .export-actions {
   display: flex;
   flex-wrap: wrap;
@@ -563,7 +568,7 @@ body {
         <button type="button" class="link-btn" id="btn-debug">
           Diagnose: zeigen, was beim letzten Einfügen ankam
         </button>
-        &middot; Version 2026-09-20b
+        &middot; Version 2026-09-20c
       </p>
     </footer>
   </div>
@@ -643,10 +648,116 @@ body {
     focusEditor();
     if (ALIGN_COMMANDS[command]) {
       applyAlignment(ALIGN_COMMANDS[command]);
+    } else if (command === "underline") {
+      toggleUnderline();
     } else {
       document.execCommand(command, false, null);
     }
     updateToolbarState();
+  }
+
+  function styleHasUnderline(el) {
+    if (!(el instanceof HTMLElement)) return false;
+    const deco = (
+      el.style.textDecoration ||
+      el.style.textDecorationLine ||
+      ""
+    ).toString();
+    return deco.includes("underline");
+  }
+
+  function clearUnderlineStyle(el) {
+    if (!(el instanceof HTMLElement)) return;
+    const deco = (el.style.textDecoration || "").toString().trim();
+    const decoLine = (el.style.textDecorationLine || "").toString().trim();
+
+    if (deco) {
+      const next = deco
+        .split(/\s+/)
+        .filter((part) => part && part !== "underline")
+        .join(" ");
+      el.style.textDecoration = next || "";
+    }
+    if (decoLine) {
+      const next = decoLine
+        .split(/\s+/)
+        .filter((part) => part && part !== "underline")
+        .join(" ");
+      el.style.textDecorationLine = next || "";
+    }
+    if (!el.getAttribute("style")) el.removeAttribute("style");
+  }
+
+  function selectionHasUnderline() {
+    try {
+      if (document.queryCommandState("underline")) return true;
+    } catch (_) {
+      /* ignore */
+    }
+
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return false;
+    const range = sel.getRangeAt(0);
+
+    let node = range.commonAncestorContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+    while (node && node !== editor) {
+      if (node.tagName === "U" || node.tagName === "INS") return true;
+      if (styleHasUnderline(node)) return true;
+      node = node.parentElement;
+    }
+
+    if (range.collapsed) return false;
+
+    const marked = editor.querySelectorAll("u, ins, [style*='underline']");
+    for (const el of marked) {
+      if (rangeIntersectsNode(range, el)) return true;
+    }
+    return false;
+  }
+
+  function removeUnderlineInSelection() {
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+
+    const wrappers = Array.from(editor.querySelectorAll("u, ins")).filter((el) => {
+      if (range.collapsed) {
+        let node = range.startContainer;
+        if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+        return el === node || el.contains(node);
+      }
+      return rangeIntersectsNode(range, el);
+    });
+    wrappers.forEach(unwrapElement);
+
+    const styled = Array.from(editor.querySelectorAll("[style*='underline']")).filter((el) => {
+      if (!styleHasUnderline(el)) return false;
+      if (range.collapsed) {
+        let node = range.startContainer;
+        if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+        return el === node || el.contains(node);
+      }
+      return rangeIntersectsNode(range, el);
+    });
+    styled.forEach(clearUnderlineStyle);
+
+    // Browser-native <u> leftovers after mixed pastes
+    try {
+      if (document.queryCommandState("underline")) {
+        document.execCommand("underline", false, null);
+      }
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  function toggleUnderline() {
+    if (selectionHasUnderline()) {
+      removeUnderlineInSelection();
+    } else {
+      document.execCommand("underline", false, null);
+    }
   }
 
   function rangeIntersectsNode(range, node) {
@@ -759,6 +870,8 @@ body {
             return current === wanted;
           });
         }
+      } else if (cmd === "underline") {
+        active = selectionHasUnderline();
       } else {
         try {
           active = document.queryCommandState(cmd);
