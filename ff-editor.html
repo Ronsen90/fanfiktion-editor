@@ -1036,18 +1036,22 @@ body {
     });
   }
 
-  function cleanPastedHtml(root) {
+  function cleanPastedHtml(root, rawHtml) {
     // Google Docs wraps the whole paste in <b id="docs-internal-guid-...">
     root
       .querySelectorAll('b[id^="docs-internal-guid"], span[id^="docs-internal-guid"]')
       .forEach(unwrapElement);
 
+    const fromWord = looksLikeWordPaste(root, rawHtml);
+
     // Strip noisy attrs and spacing styles; alignment and text styles stay
     root.querySelectorAll("*").forEach((el) => {
       if (!(el instanceof HTMLElement)) return;
-      ["id", "dir", "role"].forEach((attr) => el.removeAttribute(attr));
+      ["id", "dir", "role", "lang"].forEach((attr) => el.removeAttribute(attr));
       Array.from(el.attributes).forEach((attr) => {
-        if (attr.name.startsWith("data-")) el.removeAttribute(attr.name);
+        if (attr.name.startsWith("data-") || attr.name.startsWith("mso-")) {
+          el.removeAttribute(attr.name);
+        }
       });
 
       if (el.style) {
@@ -1063,21 +1067,39 @@ body {
           "lineHeight",
           "minHeight",
           "height",
+          "fontSize",
+          "fontFamily",
+          "tabInterval",
+          "wordWrap",
         ].forEach((prop) => {
           el.style[prop] = "";
         });
         if (!(el.getAttribute("style") || "").trim()) el.removeAttribute("style");
       }
+
+      // Word-Klassen sind für den Editor egal
+      if (fromWord && el.className && /\bMso/i.test(String(el.className))) {
+        el.removeAttribute("class");
+      }
     });
+
+    if (fromWord) stripWordOfficeJunk(root);
 
     // FanFiktion.de sprinkles empty bookmark spans between the lines
     Array.from(root.querySelectorAll("span")).forEach((el) => {
       if (!el.childNodes.length) el.remove();
     });
 
-    // Papyrus u. a.: Zeilenumbrüche oft als echte \n in Textknoten (sichtbar
-    // nur wegen pre-wrap) → in <br> überführen, damit Absätze echte Struktur haben
-    expandTextNewlines(root);
+    if (fromWord) {
+      // Word bricht lange Absätze in der HTML-Quelle um – das sind Soft-Wraps,
+      // keine echten Zeilenumbrüche → zu Leerzeichen zusammenziehen
+      collapseSoftWrapNewlines(root);
+    } else {
+      // Papyrus u. a.: echte \n in Textknoten → <br>
+      expandTextNewlines(root);
+    }
+
+    if (fromWord) unwrapUselessSpans(root);
 
     liftInlineAlignment(root);
 
@@ -1093,6 +1115,62 @@ body {
       }
     }
     whitespaceNodes.forEach((node) => node.parentNode.removeChild(node));
+
+    if (fromWord) normalizeEmptyWordParagraphs(root);
+  }
+
+  function looksLikeWordPaste(root, rawHtml) {
+    if (rawHtml && /urn:schemas-microsoft-com:office|ProgId\s*=\s*Word|Microsoft Word|class=["']?Mso/i.test(rawHtml)) {
+      return true;
+    }
+    return Array.from(root.querySelectorAll("*")).some((el) => {
+      const cls = String(el.className || "");
+      const tag = el.tagName || "";
+      return /\bMso/i.test(cls) || /^O:/i.test(tag) || tag.toLowerCase() === "o:p";
+    });
+  }
+
+  function stripWordOfficeJunk(root) {
+    Array.from(root.querySelectorAll("*")).forEach((el) => {
+      const tag = (el.tagName || "").toLowerCase();
+      // <o:p> und ähnliche Office-Marker
+      if (tag === "o:p" || /^o:/.test(tag)) {
+        el.remove();
+        return;
+      }
+      // Leere Conditional-Comment-Reste / Meta-Reste sollten schon weg sein
+      if (tag === "meta" || tag === "link" || tag === "xml") el.remove();
+    });
+  }
+
+  function collapseSoftWrapNewlines(root) {
+    const nodes = [];
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach((node) => {
+      const raw = node.nodeValue || "";
+      if (!/\r?\n/.test(raw)) return;
+      // Soft-Wraps und Einrückung → einzelnes Leerzeichen
+      node.nodeValue = raw.replace(/[ \t]*\r?\n[ \t]*/g, " ");
+    });
+  }
+
+  function unwrapUselessSpans(root) {
+    // Nach dem Style-Strip oft nur noch leere Wrapper
+    Array.from(root.querySelectorAll("span")).forEach((el) => {
+      if (!(el instanceof HTMLElement)) return;
+      if (el.attributes.length) return;
+      unwrapElement(el);
+    });
+  }
+
+  function normalizeEmptyWordParagraphs(root) {
+    Array.from(root.querySelectorAll("p")).forEach((p) => {
+      const text = (p.textContent || "").replace(/\u00a0/g, " ").trim();
+      if (!text) {
+        p.innerHTML = "<br>";
+      }
+    });
   }
 
   function expandTextNewlines(root) {
@@ -1671,7 +1749,7 @@ body {
       const comments = [];
       while (walker.nextNode()) comments.push(walker.currentNode);
       comments.forEach((c) => c.remove());
-      cleanPastedHtml(tmp);
+      cleanPastedHtml(tmp, html);
       lastPaste.cleanedHtml = tmp.innerHTML;
 
       // Copying only part of a paragraph drops its alignment in the clipboard
