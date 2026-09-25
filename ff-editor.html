@@ -568,7 +568,7 @@ body {
         <button type="button" class="link-btn" id="btn-debug">
           Diagnose: zeigen, was beim letzten Einfügen ankam
         </button>
-        &middot; Version 2026-09-22
+        &middot; Version 2026-09-20e
       </p>
     </footer>
   </div>
@@ -1042,7 +1042,7 @@ body {
       .querySelectorAll('b[id^="docs-internal-guid"], span[id^="docs-internal-guid"]')
       .forEach(unwrapElement);
 
-    const fromWord = looksLikeWordPaste(root, rawHtml);
+    const officeSoftWrap = looksLikeOfficeSoftWrapPaste(root, rawHtml);
 
     // Strip noisy attrs and spacing styles; alignment and text styles stay
     root.querySelectorAll("*").forEach((el) => {
@@ -1071,35 +1071,36 @@ body {
           "fontFamily",
           "tabInterval",
           "wordWrap",
+          "background",
         ].forEach((prop) => {
           el.style[prop] = "";
         });
         if (!(el.getAttribute("style") || "").trim()) el.removeAttribute("style");
       }
 
-      // Word-Klassen sind für den Editor egal
-      if (fromWord && el.className && /\bMso/i.test(String(el.className))) {
+      // Office-Klassen sind für den Editor egal
+      if (officeSoftWrap && el.className && /\bMso/i.test(String(el.className))) {
         el.removeAttribute("class");
       }
     });
 
-    if (fromWord) stripWordOfficeJunk(root);
+    if (officeSoftWrap) stripWordOfficeJunk(root);
 
     // FanFiktion.de sprinkles empty bookmark spans between the lines
     Array.from(root.querySelectorAll("span")).forEach((el) => {
       if (!el.childNodes.length) el.remove();
     });
 
-    if (fromWord) {
-      // Word bricht lange Absätze in der HTML-Quelle um – das sind Soft-Wraps,
-      // keine echten Zeilenumbrüche → zu Leerzeichen zusammenziehen
+    if (officeSoftWrap) {
+      // Word/LibreOffice brechen lange Absätze in der HTML-Quelle um –
+      // Soft-Wraps, keine echten Zeilenumbrüche → zu Leerzeichen zusammenziehen
       collapseSoftWrapNewlines(root);
     } else {
       // Papyrus u. a.: echte \n in Textknoten → <br>
       expandTextNewlines(root);
     }
 
-    if (fromWord) unwrapUselessSpans(root);
+    if (officeSoftWrap) unwrapUselessSpans(root);
 
     liftInlineAlignment(root);
 
@@ -1116,17 +1117,27 @@ body {
     }
     whitespaceNodes.forEach((node) => node.parentNode.removeChild(node));
 
-    if (fromWord) normalizeEmptyWordParagraphs(root);
+    if (officeSoftWrap) normalizeEmptyWordParagraphs(root);
   }
 
-  function looksLikeWordPaste(root, rawHtml) {
-    if (rawHtml && /urn:schemas-microsoft-com:office|ProgId\s*=\s*Word|Microsoft Word|class=["']?Mso/i.test(rawHtml)) {
+  function looksLikeOfficeSoftWrapPaste(root, rawHtml) {
+    // Word, LibreOffice und OpenOffice: Absätze in der HTML-Quelle umgebrochen
+    if (
+      rawHtml &&
+      /urn:schemas-microsoft-com:office|ProgId\s*=\s*Word|Microsoft Word|class=["']?Mso|LibreOffice|OpenOffice|generator["']?\s+content=["'][^"']*(Libre|Open)Office/i.test(
+        rawHtml
+      )
+    ) {
       return true;
     }
     return Array.from(root.querySelectorAll("*")).some((el) => {
       const cls = String(el.className || "");
       const tag = el.tagName || "";
-      return /\bMso/i.test(cls) || /^O:/i.test(tag) || tag.toLowerCase() === "o:p";
+      if (/\bMso/i.test(cls) || /^O:/i.test(tag) || tag.toLowerCase() === "o:p") return true;
+      if (tag === "META" && /LibreOffice|OpenOffice/i.test(el.getAttribute("content") || "")) {
+        return true;
+      }
+      return false;
     });
   }
 
@@ -1138,8 +1149,10 @@ body {
         el.remove();
         return;
       }
-      // Leere Conditional-Comment-Reste / Meta-Reste sollten schon weg sein
-      if (tag === "meta" || tag === "link" || tag === "xml") el.remove();
+      // Meta/Title/Head-Reste von Word/LibreOffice
+      if (tag === "meta" || tag === "link" || tag === "xml" || tag === "title" || tag === "head") {
+        el.remove();
+      }
     });
   }
 
@@ -1744,7 +1757,9 @@ body {
     if (html) {
       const tmp = document.createElement("div");
       tmp.innerHTML = html;
-      tmp.querySelectorAll("script, style, meta, link").forEach((n) => n.remove());
+      // Head-Reste (LibreOffice liefert oft volles HTML-Dokument)
+      tmp.querySelectorAll("script, style, meta, link, title, head").forEach((n) => n.remove());
+      Array.from(tmp.querySelectorAll("html, body")).forEach((el) => unwrapElement(el));
       const walker = document.createTreeWalker(tmp, NodeFilter.SHOW_COMMENT);
       const comments = [];
       while (walker.nextNode()) comments.push(walker.currentNode);
